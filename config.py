@@ -10,7 +10,7 @@ MODEL = "openrouter/free"
 
 # Batching & rate limiting
 BATCH_SIZE = 10
-RATE_LIMIT_DELAY = 4.0  # seconds between batches (stays under 20 req/min)
+RATE_LIMIT_DELAY = 1.0  # seconds between batches (allows up to 60 req/min, capped by main.py at 50)
 MAX_RETRIES = 3
 RETRY_DELAY = 10.0  # seconds between retries on failure
 
