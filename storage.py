@@ -1,4 +1,4 @@
-"""Consolidated file I/O — tweets, progress, categories."""
+"""Consolidated file I/O — tweets, progress, categories, rate tracking."""
 import json
 import os
 import time
@@ -36,13 +36,32 @@ def load_progress() -> dict:
         return json.load(f).get("processed", {})
 
 
-def save_progress(processed: dict):
+def save_progress(processed: dict, requests_today: int = 0):
     with open(PROGRESS_FILE, "w", encoding="utf-8") as f:
         json.dump(
-            {"processed": processed, "last_updated": time.strftime("%Y-%m-%d %H:%M:%S")},
+            {
+                "processed": processed,
+                "last_updated": time.strftime("%Y-%m-%d %H:%M:%S"),
+                "rate": {
+                    "date": time.strftime("%Y-%m-%d"),
+                    "requests": requests_today,
+                },
+            },
             f,
             indent=2,
         )
+
+
+def load_requests_today() -> int:
+    """Get the number of API requests already made today."""
+    if not os.path.exists(PROGRESS_FILE):
+        return 0
+    with open(PROGRESS_FILE, "r", encoding="utf-8") as f:
+        data = json.load(f)
+    rate = data.get("rate", {})
+    if rate.get("date") == time.strftime("%Y-%m-%d"):
+        return rate.get("requests", 0)
+    return 0  # new day, counter resets
 
 
 # --- Categories ---

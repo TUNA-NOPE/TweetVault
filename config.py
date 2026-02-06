@@ -10,9 +10,13 @@ MODEL = "openrouter/free"
 
 # Batching & rate limiting
 BATCH_SIZE = 10
-RATE_LIMIT_DELAY = 1.0  # seconds between batches
+RATE_LIMIT_DELAY = 4.0  # seconds between batches (stays under 20 req/min)
 MAX_RETRIES = 3
-RETRY_DELAY = 5.0  # seconds between retries
+RETRY_DELAY = 10.0  # seconds between retries on failure
+
+# Daily request cap — protects against OpenRouter's daily limit.
+# Free tier (no credits): 50/day.  With $10+ credits: 1000/day.
+DAILY_REQUEST_LIMIT = 1000
 
 # File paths
 INPUT_FILE = "twitter-Bookmarks-1770374722863.json"

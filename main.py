@@ -10,6 +10,7 @@ from config import (
     CATEGORIES_FILE,
     BATCH_SIZE,
     RATE_LIMIT_DELAY,
+    DAILY_REQUEST_LIMIT,
 )
 from storage import (
     load_tweets,
@@ -21,6 +22,7 @@ from storage import (
     load_dynamic_categories,
     save_dynamic_categories,
     invert_to_categories,
+    load_requests_today,
 )
 from classifier import classify_batch
 from writer import write_all
@@ -39,10 +41,11 @@ def print_summary(categorized: dict):
     print(f"  Categories used: {len(categorized)}")
 
 
-def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int):
+def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, daily_limit: int):
     processed = load_progress()
     categories = load_all_categories()
     dynamic = load_dynamic_categories()
+    requests_today = load_requests_today()
 
     # Collect unprocessed tweets
     remaining: list[tuple[str, str, str]] = []
@@ -65,29 +68,49 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int):
             print_summary(categorized)
         return
 
-    print(f"\nProcessing {len(remaining)} tweets in batches of {batch_size}...")
-    if processed:
-        print(f"  (Skipping {len(processed)} already processed)")
-
     total_batches = (len(remaining) + batch_size - 1) // batch_size
+    budget = daily_limit - requests_today
+    if budget <= 0:
+        print(f"\nDaily limit reached ({daily_limit} requests).")
+        print("Run again tomorrow — progress is saved, will auto-resume.")
+        print(f"  Processed so far: {len(processed)} tweets, {len(remaining)} remaining")
+        return
 
+    runnable = min(total_batches, budget)
+    runnable_tweets = min(len(remaining), runnable * batch_size)
+
+    print(f"\n{len(remaining)} tweets remaining ({len(processed)} already done)")
+    print(f"  Batches: {runnable}/{total_batches} (daily budget: {budget} of {daily_limit} requests left)")
+    print(f"  Tweets this run: ~{runnable_tweets}")
+    print(f"  Delay: {RATE_LIMIT_DELAY}s between batches")
+    est_minutes = (runnable * RATE_LIMIT_DELAY) / 60
+    print(f"  Estimated time: ~{est_minutes:.1f} min")
+
+    batches_done = 0
     for batch_num in range(total_batches):
+        if requests_today >= daily_limit:
+            tweets_left = len(remaining) - (batch_num * batch_size)
+            print(f"\nDaily limit reached ({daily_limit} requests).")
+            print(f"  {tweets_left} tweets remaining — run again tomorrow to continue.")
+            break
+
         start = batch_num * batch_size
         batch = remaining[start : start + batch_size]
 
-        print(f"\n[Batch {batch_num + 1}/{total_batches}] {len(batch)} tweets")
+        print(f"\n[Batch {batch_num + 1}/{total_batches}] {len(batch)} tweets  (req {requests_today + 1}/{daily_limit} today)")
         for tid, author, text in batch:
             preview = text[:60].replace("\n", " ")
             print(f"  @{author}: {preview}{'...' if len(text) > 60 else ''}")
 
         results = classify_batch(batch, categories)
+        requests_today += 1
+        batches_done += 1
 
         for tid, author, _ in batch:
             r = results[tid]
             cats = r["categories"]
             print(f"  @{author} -> {', '.join(c.replace('_', ' ').title() for c in cats)}")
 
-            # Register new dynamic categories in memory
             for new_id, desc in r["new_categories"].items():
                 new_id = new_id.lower().replace(" ", "_")
                 if new_id not in categories:
@@ -97,24 +120,30 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int):
 
             processed[tid] = cats
 
-        # Save progress after each batch (true resumability)
+        # Save after each batch
         if not dry_run:
-            save_progress(processed)
+            save_progress(processed, requests_today)
             if dynamic:
                 save_dynamic_categories(dynamic)
 
         # Rate limit between batches
-        if batch_num < total_batches - 1:
+        if batch_num < total_batches - 1 and requests_today < daily_limit:
             time.sleep(RATE_LIMIT_DELAY)
 
     categorized = invert_to_categories(processed)
     print_summary(categorized)
+    print(f"\n  API requests used today: {requests_today}/{daily_limit}")
 
     if not dry_run:
         print(f"\nGenerating markdown in {OUTPUT_DIR}/...")
         tweet_index = build_tweet_index(tweets)
         write_all(categorized, categories, tweet_index)
-        print("\nDone!")
+        total_remaining = sum(1 for i, t in enumerate(tweets) if get_tweet_id(t, i) not in processed)
+        if total_remaining > 0:
+            print(f"\nPaused — {total_remaining} tweets remaining.")
+            print("Run again tomorrow (or increase --daily-limit if you have $10+ credits).")
+        else:
+            print("\nAll tweets classified!")
     else:
         print("\nDry run complete - no files saved")
 
@@ -125,8 +154,9 @@ def main():
         formatter_class=argparse.RawDescriptionHelpFormatter,
         epilog="""
 Examples:
-  python main.py                       Process all tweets
-  python main.py --limit 20            Process 20 tweets
+  python main.py                       Process all tweets (within daily limit)
+  python main.py --daily-limit 1000    Use higher limit ($10+ credits)
+  python main.py --limit 20            Process max 20 tweets
   python main.py --limit 5 --dry-run   Test with 5 tweets
   python main.py --batch-size 5        Use smaller batches
   python main.py --reset               Reset and start fresh
@@ -139,6 +169,8 @@ Examples:
     parser.add_argument("--input", "-i", type=str, default=INPUT_FILE, help="Input JSON file")
     parser.add_argument("--categories", "-c", action="store_true", help="Show categories")
     parser.add_argument("--batch-size", "-b", type=int, default=BATCH_SIZE, help="Tweets per API call")
+    parser.add_argument("--daily-limit", type=int, default=DAILY_REQUEST_LIMIT,
+                        help=f"Max API requests per day (default: {DAILY_REQUEST_LIMIT}, use 1000 with $10+ credits)")
 
     args = parser.parse_args()
 
@@ -172,7 +204,13 @@ Examples:
 
     print(f"Loaded {len(tweets)} tweets")
     os.makedirs(OUTPUT_DIR, exist_ok=True)
-    process(tweets, limit=args.limit, dry_run=args.dry_run, batch_size=args.batch_size)
+    process(
+        tweets,
+        limit=args.limit,
+        dry_run=args.dry_run,
+        batch_size=args.batch_size,
+        daily_limit=args.daily_limit,
+    )
 
 
 if __name__ == "__main__":
