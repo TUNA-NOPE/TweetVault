@@ -2,6 +2,8 @@ import Link from "next/link";
 import { getTweetsByCategory, getCategoryDescriptions } from "@/lib/data";
 import TweetCard from "@/components/tweet-card";
 
+export const dynamic = "force-dynamic";
+
 export default function CategoryPage({
   params,
 }: {

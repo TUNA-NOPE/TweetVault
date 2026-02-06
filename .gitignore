@@ -8,7 +8,7 @@ __pycache__/
 *.json
 !categories.json
 !web/package.json
-!web/package-lock.json
+!web/pnpm-lock.yaml
 !web/tsconfig.json
 
 # Output
