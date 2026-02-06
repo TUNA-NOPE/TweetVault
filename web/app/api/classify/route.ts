@@ -10,6 +10,8 @@ type ClassifierState = {
   subscribers: Set<ReadableStreamDefaultController>;
   logs: string[]; // JSON strings of message objects
   done: boolean;
+  latestProgress: any | null;
+  latestStatus: any | null;
 };
 
 // Use globalThis to persist state across hot reloads in dev
@@ -21,6 +23,8 @@ if (!globalState.classifierState) {
     subscribers: new Set(),
     logs: [],
     done: false,
+    latestProgress: null,
+    latestStatus: null,
   };
 }
 
@@ -45,6 +49,8 @@ function startProcess(limit: number | null, batchSize: number) {
 
   state.logs = [];
   state.done = false;
+  state.latestProgress = null;
+  state.latestStatus = null;
 
   const args = ["main.py", "--batch-size", String(batchSize), "--web"];
   if (limit) args.push("--limit", String(limit));
@@ -72,6 +78,14 @@ function startProcess(limit: number | null, batchSize: number) {
         try {
           // Try to parse structured JSON from Python
           msg = JSON.parse(line);
+
+          if (msg.type === "progress") {
+            state.latestProgress = msg;
+          } else if (msg.type === "status") {
+            state.latestStatus = msg;
+          } else if (msg.type === "done" || msg.done) {
+            state.done = true;
+          }
         } catch {
           // Fallback for non-JSON lines (e.g. from libraries)
           msg = { line: line };
@@ -159,6 +173,8 @@ export async function GET() {
   return NextResponse.json({
     running: !!state.process,
     done: state.done,
-    logCount: state.logs.length
+    logCount: state.logs.length,
+    progress: state.latestProgress,
+    status: state.latestStatus
   });
 }

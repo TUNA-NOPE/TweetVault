@@ -30,6 +30,11 @@ export default function ClassifyPanel({
       .then((data) => {
         if (data.running) {
           setOpen(true);
+
+          // Instant resume state
+          if (data.progress) setProgress(data.progress.percent);
+          if (data.status) setStatusMessage(data.status.message);
+
           // Small delay to ensure state updates before starting stream
           setTimeout(() => start(), 100);
         }
