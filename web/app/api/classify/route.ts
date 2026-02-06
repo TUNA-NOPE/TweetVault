@@ -12,7 +12,8 @@ export async function POST(request: NextRequest) {
   const args = ["main.py", "--batch-size", String(batchSize)];
   if (limit) args.push("--limit", String(limit));
 
-  const proc = spawn("python3", args, {
+  const pythonPath = path.join(DATA_DIR, "venv", "bin", "python");
+  const proc = spawn(pythonPath, args, {
     cwd: DATA_DIR,
     env: { ...process.env },
   });
