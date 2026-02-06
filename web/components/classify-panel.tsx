@@ -36,7 +36,7 @@ export default function ClassifyPanel({
           if (data.status) setStatusMessage(data.status.message);
 
           // Small delay to ensure state updates before starting stream
-          setTimeout(() => start(), 100);
+          setTimeout(() => start(true), 100);
         }
       })
       .catch(() => { });
@@ -52,12 +52,19 @@ export default function ClassifyPanel({
     return () => clearInterval(interval);
   }, [running, router]);
 
-  async function start() {
+  async function start(isResume = false) {
     setRunning(true);
-    setLogs([]);
-    setDone(false);
-    setProgress(0);
-    setStatusMessage("Initializing...");
+
+    if (!isResume) {
+      setLogs([]);
+      setDone(false);
+      setProgress(0);
+      setStatusMessage("Initializing...");
+    } else {
+      // If resuming, we want to reset 'done' to false just in case, 
+      // but keep existing logs/progress/status
+      setDone(false);
+    }
 
     try {
       const resp = await fetch("/api/classify", {
@@ -160,7 +167,7 @@ export default function ClassifyPanel({
                        transition-colors"
           />
           <button
-            onClick={start}
+            onClick={() => start(false)}
             className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white
                        hover:bg-blue-500 transition-colors"
           >
