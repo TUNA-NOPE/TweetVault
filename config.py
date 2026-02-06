@@ -1,23 +1,24 @@
-"""
-Configuration for Tweet Classification System
-"""
 import os
 from dotenv import load_dotenv
 
-# Load environment variables from .env file
 load_dotenv()
 
-# OpenRouter API Configuration
+# OpenRouter API
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
-OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
-
-# Free route from OpenRouter (auto-selects best available free model)
+OPENROUTER_URL = "https://openrouter.ai/api/v1/chat/completions"
 MODEL = "openrouter/free"
 
-# Rate limiting (free tier is limited)
-RATE_LIMIT_DELAY = 1.0  # seconds between requests
+# Batching & rate limiting
+BATCH_SIZE = 10
+RATE_LIMIT_DELAY = 1.0  # seconds between batches
 MAX_RETRIES = 3
-RETRY_DELAY = 5.0  # seconds
+RETRY_DELAY = 5.0  # seconds between retries
+
+# File paths
+INPUT_FILE = "twitter-Bookmarks-1770374722863.json"
+OUTPUT_DIR = "output"
+PROGRESS_FILE = "progress.json"
+CATEGORIES_FILE = "categories.json"
 
 # Base categories (AI can add more dynamically)
 BASE_CATEGORIES = {
@@ -29,13 +30,5 @@ BASE_CATEGORIES = {
     "finance_crypto": "Investing, cryptocurrency, trading, personal finance",
     "humor_memes": "Funny content, jokes, memes, entertainment",
     "news_politics": "Current events, political commentary, world news",
-    "misc": "Content that doesn't fit other categories"
+    "misc": "Content that doesn't fit other categories",
 }
-
-# Output settings
-OUTPUT_DIR = "output"
-PROGRESS_FILE = "progress.json"
-CATEGORIES_FILE = "categories.json"  # Stores dynamically created categories
-
-# Input file
-INPUT_FILE = "twitter-Bookmarks-1770374722863.json"

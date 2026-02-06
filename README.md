@@ -1,29 +1,23 @@
-# 🐦 TweetVault
+# TweetVault
 
-AI-powered Twitter bookmark classifier using OpenRouter's free AI models.
+AI-powered Twitter bookmark classifier using OpenRouter's free route.
 
 ## Features
 
-- **Multi-category classification** - Tweets can belong to multiple categories
+- **Batch classification** - Classifies 10 tweets per API call (configurable)
+- **Multi-category** - Tweets can belong to multiple categories
 - **Dynamic categories** - AI creates new categories when needed
-- **Reference-based output** - MD files contain tweet IDs, keeping JSON as source of truth
-- **Resumable processing** - Progress is saved automatically
+- **Resumable** - Progress saved after every batch
+- **Reference-based output** - Markdown files reference tweet IDs, JSON stays source of truth
 
 ## Setup
 
 ```bash
-# Clone the repo
 git clone https://github.com/YOUR_USERNAME/TweetVault.git
 cd TweetVault
-
-# Create virtual environment
 python3 -m venv venv
 source venv/bin/activate
-
-# Install dependencies
 pip install -r requirements.txt
-
-# Add your API key
 cp .env.example .env
 # Edit .env with your OpenRouter API key
 ```
@@ -31,48 +25,33 @@ cp .env.example .env
 ## Usage
 
 ```bash
-# Activate venv
 source venv/bin/activate
 
-# Show available categories
-python main.py --categories
-
-# Test with 5 tweets (dry run)
-python main.py --limit 5 --dry-run
-
-# Process 50 tweets
-python main.py --limit 50
-
-# Process all tweets
-python main.py
-
-# Reset progress
-python main.py --reset
+python main.py                       # Process all tweets
+python main.py --limit 20            # Process 20 tweets
+python main.py --limit 5 --dry-run   # Test with 5 tweets
+python main.py --batch-size 5        # Smaller batches
+python main.py --categories          # Show all categories
+python main.py --reset               # Reset progress
 ```
 
-## Output
+## Project Structure
 
-Categorized tweets are saved in `output/` as markdown files with tweet references:
-
-```markdown
-# Tech Programming
-
-**Total tweets:** 42
-
----
-
-### 1. @author
-> Tweet preview text...
-
-**ID:** `1234567890` | [View Tweet](url)
+```
+config.py       Settings (model, batch size, rate limits, base categories)
+storage.py      All file I/O (tweets, progress, categories)
+classifier.py   Batch classification via OpenRouter API
+writer.py       Markdown output generation
+main.py         CLI + orchestration
 ```
 
 ## Configuration
 
 Edit `config.py` to customize:
-- Base categories
-- Rate limiting
-- Model selection
+- `BATCH_SIZE` - Tweets per API call (default: 10)
+- `BASE_CATEGORIES` - Starting category set
+- `RATE_LIMIT_DELAY` - Delay between batches
+- `MODEL` - OpenRouter model route
 
 ## License
 
