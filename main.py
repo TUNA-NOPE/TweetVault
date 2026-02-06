@@ -17,7 +17,7 @@ from config import (
 )
 
 # Rate limits
-REQUESTS_PER_MINUTE = 50
+REQUESTS_PER_MINUTE = 20
 MINUTE_WINDOW = 60  # seconds
 from storage import (
     load_tweets,
