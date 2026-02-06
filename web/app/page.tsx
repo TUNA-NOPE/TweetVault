@@ -31,7 +31,7 @@ export default function HomePage() {
 
       {/* Classify panel — shown when there are unclassified tweets */}
       {unclassified > 0 && (
-        <ClassifyPanel unclassifiedCount={unclassified} />
+        <ClassifyPanel unclassifiedCount={unclassified} stats={stats} />
       )}
 
       {/* Category grid */}

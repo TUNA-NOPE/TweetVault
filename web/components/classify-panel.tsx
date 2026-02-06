@@ -5,15 +5,21 @@ import { useRouter } from "next/navigation";
 
 export default function ClassifyPanel({
   unclassifiedCount,
+  stats,
 }: {
   unclassifiedCount: number;
+  stats: { totalTweets: number; classifiedTweets: number };
 }) {
+  const initialPercent = stats.totalTweets > 0
+    ? Math.floor((stats.classifiedTweets / stats.totalTweets) * 100)
+    : 0;
+
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
   const [logs, setLogs] = useState<any[]>([]);
   const [done, setDone] = useState(false);
   const [limit, setLimit] = useState("");
-  const [progress, setProgress] = useState(0);
+  const [progress, setProgress] = useState(initialPercent);
   const [statusMessage, setStatusMessage] = useState("");
   const [showDebug, setShowDebug] = useState(false);
   const logsRef = useRef<HTMLDivElement>(null);
@@ -58,7 +64,9 @@ export default function ClassifyPanel({
     if (!isResume) {
       setLogs([]);
       setDone(false);
-      setProgress(0);
+      // Don't reset to 0, reset to current "actual" progress from server stats if available
+      // But better to trust the initialPercent or keep current if we have it
+      setProgress(progress > 0 ? progress : initialPercent);
       setStatusMessage("Initializing...");
     } else {
       // If resuming, we want to reset 'done' to false just in case, 
