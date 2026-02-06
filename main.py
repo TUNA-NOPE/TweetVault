@@ -2,6 +2,7 @@
 import argparse
 import os
 import time
+from datetime import datetime, timedelta
 
 from config import (
     INPUT_FILE,
@@ -12,6 +13,10 @@ from config import (
     RATE_LIMIT_DELAY,
     DAILY_REQUEST_LIMIT,
 )
+
+# Rate limits
+REQUESTS_PER_MINUTE = 50
+MINUTE_WINDOW = 60  # seconds
 from storage import (
     load_tweets,
     get_tweet_id,
@@ -41,11 +46,45 @@ def print_summary(categorized: dict):
     print(f"  Categories used: {len(categorized)}")
 
 
+def wait_for_rate_limit(requests_this_minute: list[float], requests_today: int, daily_limit: int) -> bool:
+    """Wait if we're hitting rate limits. Returns True if we can continue, False if daily limit hit."""
+    now = time.time()
+    
+    # Clean up old requests (older than 1 minute)
+    requests_this_minute[:] = [t for t in requests_this_minute if now - t < MINUTE_WINDOW]
+    
+    # Check daily limit - sleep until midnight if reached
+    if requests_today >= daily_limit:
+        now_dt = datetime.now()
+        tomorrow = (now_dt + timedelta(days=1)).replace(hour=0, minute=0, second=5, microsecond=0)
+        sleep_seconds = (tomorrow - now_dt).total_seconds()
+        hours = sleep_seconds / 3600
+        print(f"\n⏸ Daily limit reached ({daily_limit} requests).")
+        print(f"  Sleeping for {hours:.1f} hours until midnight...")
+        print(f"  Will resume at {tomorrow.strftime('%Y-%m-%d %H:%M:%S')}")
+        time.sleep(sleep_seconds)
+        return True  # Signal that we should reload requests_today
+    
+    # Check per-minute limit
+    if len(requests_this_minute) >= REQUESTS_PER_MINUTE:
+        oldest = min(requests_this_minute)
+        sleep_time = MINUTE_WINDOW - (now - oldest) + 1  # +1 second buffer
+        if sleep_time > 0:
+            print(f"\n⏸ Minute rate limit ({REQUESTS_PER_MINUTE}/min) - sleeping {sleep_time:.0f}s...")
+            time.sleep(sleep_time)
+            # Clean up again after sleeping
+            now = time.time()
+            requests_this_minute[:] = [t for t in requests_this_minute if now - t < MINUTE_WINDOW]
+    
+    return False
+
+
 def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, daily_limit: int):
     processed = load_progress()
     categories = load_all_categories()
     dynamic = load_dynamic_categories()
     requests_today = load_requests_today()
+    requests_this_minute: list[float] = []  # Timestamps of recent requests
 
     # Collect unprocessed tweets
     remaining: list[tuple[str, str, str]] = []
@@ -69,42 +108,32 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
         return
 
     total_batches = (len(remaining) + batch_size - 1) // batch_size
-    budget = daily_limit - requests_today
-    if budget <= 0:
-        print(f"\nDaily limit reached ({daily_limit} requests).")
-        print("Run again tomorrow — progress is saved, will auto-resume.")
-        print(f"  Processed so far: {len(processed)} tweets, {len(remaining)} remaining")
-        return
-
-    runnable = min(total_batches, budget)
-    runnable_tweets = min(len(remaining), runnable * batch_size)
 
     print(f"\n{len(remaining)} tweets remaining ({len(processed)} already done)")
-    print(f"  Batches: {runnable}/{total_batches} (daily budget: {budget} of {daily_limit} requests left)")
-    print(f"  Tweets this run: ~{runnable_tweets}")
-    print(f"  Delay: {RATE_LIMIT_DELAY}s between batches")
-    est_minutes = (runnable * RATE_LIMIT_DELAY) / 60
-    print(f"  Estimated time: ~{est_minutes:.1f} min")
+    print(f"  Total batches: {total_batches}")
+    print(f"  Rate limits: {REQUESTS_PER_MINUTE}/min, {daily_limit}/day")
+    print(f"  Requests used today: {requests_today}/{daily_limit}")
+    print(f"  Will auto-sleep when hitting rate limits and continue until done.")
 
-    batches_done = 0
     for batch_num in range(total_batches):
-        if requests_today >= daily_limit:
-            tweets_left = len(remaining) - (batch_num * batch_size)
-            print(f"\nDaily limit reached ({daily_limit} requests).")
-            print(f"  {tweets_left} tweets remaining — run again tomorrow to continue.")
-            break
+        # Check and wait for rate limits
+        daily_reset = wait_for_rate_limit(requests_this_minute, requests_today, daily_limit)
+        if daily_reset:
+            # Daily limit was hit and we slept - reload today's count (should be 0 now)
+            requests_today = load_requests_today()
+            requests_this_minute.clear()
 
         start = batch_num * batch_size
         batch = remaining[start : start + batch_size]
 
-        print(f"\n[Batch {batch_num + 1}/{total_batches}] {len(batch)} tweets  (req {requests_today + 1}/{daily_limit} today)")
+        print(f"\n[Batch {batch_num + 1}/{total_batches}] {len(batch)} tweets  (req {requests_today + 1}/{daily_limit} today, {len(requests_this_minute) + 1}/{REQUESTS_PER_MINUTE} this min)")
         for tid, author, text in batch:
             preview = text[:60].replace("\n", " ")
             print(f"  @{author}: {preview}{'...' if len(text) > 60 else ''}")
 
         results = classify_batch(batch, categories)
         requests_today += 1
-        batches_done += 1
+        requests_this_minute.append(time.time())
 
         for tid, author, _ in batch:
             r = results[tid]
@@ -126,8 +155,8 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
             if dynamic:
                 save_dynamic_categories(dynamic)
 
-        # Rate limit between batches
-        if batch_num < total_batches - 1 and requests_today < daily_limit:
+        # Small delay between batches for stability
+        if batch_num < total_batches - 1:
             time.sleep(RATE_LIMIT_DELAY)
 
     categorized = invert_to_categories(processed)
@@ -138,12 +167,7 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
         print(f"\nGenerating markdown in {OUTPUT_DIR}/...")
         tweet_index = build_tweet_index(tweets)
         write_all(categorized, categories, tweet_index)
-        total_remaining = sum(1 for i, t in enumerate(tweets) if get_tweet_id(t, i) not in processed)
-        if total_remaining > 0:
-            print(f"\nPaused — {total_remaining} tweets remaining.")
-            print("Run again tomorrow (or increase --daily-limit if you have $10+ credits).")
-        else:
-            print("\nAll tweets classified!")
+        print("\n✅ All tweets classified!")
     else:
         print("\nDry run complete - no files saved")
 

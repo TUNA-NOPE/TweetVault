@@ -104,13 +104,20 @@ def classify_batch(
                 OPENROUTER_URL, headers=headers, json=payload, timeout=60
             )
             if resp.status_code == 200:
-                content = resp.json()["choices"][0]["message"]["content"]
-                return _parse_response(content, tweet_ids)
+                data = resp.json()
+                if "choices" in data and len(data["choices"]) > 0:
+                    content = data["choices"][0]["message"]["content"]
+                    return _parse_response(content, tweet_ids)
+                
+                print(f"   Unexpected API response: {data}")
+                # Fall through to retry logic
+            
             if resp.status_code == 429:
                 print(f"   Rate limited, waiting {RETRY_DELAY}s...")
                 time.sleep(RETRY_DELAY)
                 continue
-            print(f"   API error {resp.status_code}")
+                
+            print(f"   API error {resp.status_code}: {resp.text}")
             if attempt < MAX_RETRIES - 1:
                 time.sleep(RETRY_DELAY)
         except requests.exceptions.RequestException as e:

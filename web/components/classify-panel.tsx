@@ -20,6 +20,30 @@ export default function ClassifyPanel({
     logsRef.current?.scrollTo(0, logsRef.current.scrollHeight);
   }, [logs]);
 
+  // Check for active session on mount
+  useEffect(() => {
+    fetch("/api/classify")
+      .then((res) => res.json())
+      .then((data) => {
+        if (data.running) {
+          setOpen(true);
+          // Small delay to ensure state updates before starting stream
+          setTimeout(() => start(), 100);
+        }
+      })
+      .catch(() => { });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Auto-refresh stats while running
+  useEffect(() => {
+    if (!running) return;
+    const interval = setInterval(() => {
+      router.refresh();
+    }, 5000);
+    return () => clearInterval(interval);
+  }, [running, router]);
+
   async function start() {
     setRunning(true);
     setLogs([]);
@@ -143,7 +167,7 @@ export default function ClassifyPanel({
           {running && (
             <div className="mt-2 flex items-center gap-2 text-blue-400">
               <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-blue-500" />
-              Processing...
+              Processing... (Stats updating live)
             </div>
           )}
         </div>
