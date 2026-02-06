@@ -1,7 +1,7 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter }1 from "next/navigation";
+import { useRouter } from "next/navigation";
 
 export default function ClassifyPanel({
   unclassifiedCount,
