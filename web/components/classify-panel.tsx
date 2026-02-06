@@ -10,9 +10,12 @@ export default function ClassifyPanel({
 }) {
   const [open, setOpen] = useState(false);
   const [running, setRunning] = useState(false);
-  const [logs, setLogs] = useState<string[]>([]);
+  const [logs, setLogs] = useState<any[]>([]);
   const [done, setDone] = useState(false);
   const [limit, setLimit] = useState("");
+  const [progress, setProgress] = useState(0);
+  const [statusMessage, setStatusMessage] = useState("");
+  const [showDebug, setShowDebug] = useState(false);
   const logsRef = useRef<HTMLDivElement>(null);
   const router = useRouter();
 
@@ -48,6 +51,8 @@ export default function ClassifyPanel({
     setRunning(true);
     setLogs([]);
     setDone(false);
+    setProgress(0);
+    setStatusMessage("Initializing...");
 
     try {
       const resp = await fetch("/api/classify", {
@@ -80,12 +85,21 @@ export default function ClassifyPanel({
           if (!part.startsWith("data: ")) continue;
           try {
             const data = JSON.parse(part.slice(6));
-            if (data.done) {
+
+            if (data.type === "progress") {
+              setProgress(data.percent);
+            } else if (data.type === "status") {
+              setStatusMessage(data.message);
+            } else if (data.type === "new_category") {
+              setLogs((prev) => [...prev, { type: "info", text: `New category: ${data.id}` }]);
+            } else if (data.done || (data.type === "done")) {
               setDone(true);
+              setStatusMessage("Classification complete");
+              setProgress(100);
             } else if (data.line) {
-              setLogs((prev) => [...prev, data.line]);
+              setLogs((prev) => [...prev, { type: "log", text: data.line }]);
             } else if (data.error) {
-              setLogs((prev) => [...prev, data.error]);
+              setLogs((prev) => [...prev, { type: "error", text: data.error }]);
             }
           } catch {
             /* skip malformed events */
@@ -93,7 +107,7 @@ export default function ClassifyPanel({
         }
       }
     } catch (err: any) {
-      setLogs((prev) => [...prev, `Error: ${err.message}`]);
+      setLogs((prev) => [...prev, { type: "error", text: `Error: ${err.message}` }]);
     } finally {
       setRunning(false);
     }
@@ -154,20 +168,45 @@ export default function ClassifyPanel({
       )}
 
       {(running || logs.length > 0) && (
-        <div
-          ref={logsRef}
-          className="mt-4 max-h-72 overflow-y-auto rounded-lg bg-zinc-950 p-3 font-mono
-                     text-xs leading-relaxed text-zinc-400"
-        >
-          {logs.map((line, i) => (
-            <div key={i} className={line.includes("error") || line.includes("Error") ? "text-red-400" : ""}>
-              {line}
+        <div className="mt-4 space-y-4">
+          {/* Progress Bar */}
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-xs text-zinc-400">
+              <span>{statusMessage || "Starting..."}</span>
+              <span>{progress}%</span>
             </div>
-          ))}
-          {running && (
-            <div className="mt-2 flex items-center gap-2 text-blue-400">
-              <span className="inline-block h-3 w-3 animate-spin rounded-full border-2 border-zinc-600 border-t-blue-500" />
-              Processing... (Stats updating live)
+            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
+              <div
+                className="h-full bg-blue-500 transition-all duration-300 ease-out"
+                style={{ width: `${progress}%` }}
+              />
+            </div>
+          </div>
+
+          {/* New Categories Toast / Info area could go here */}
+
+          {/* Debug Toggle */}
+          <div className="pt-2">
+            <button
+              onClick={() => setShowDebug(!showDebug)}
+              className="text-[10px] uppercase tracking-wider text-zinc-600 hover:text-zinc-400"
+            >
+              {showDebug ? "Hide Debug Logs" : "Show Debug Logs"}
+            </button>
+          </div>
+
+          {/* Hidden Logs */}
+          {showDebug && (
+            <div
+              ref={logsRef}
+              className="max-h-48 overflow-y-auto rounded-lg bg-zinc-950 p-3 font-mono
+                         text-xs leading-relaxed text-zinc-400"
+            >
+              {logs.map((log, i) => (
+                <div key={i} className={log.type === "error" ? "text-red-400" : "text-zinc-500"}>
+                  {log.text}
+                </div>
+              ))}
             </div>
           )}
         </div>

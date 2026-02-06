@@ -46,7 +46,7 @@ function startProcess(limit: number | null, batchSize: number) {
   state.logs = [];
   state.done = false;
 
-  const args = ["main.py", "--batch-size", String(batchSize)];
+  const args = ["main.py", "--batch-size", String(batchSize), "--web"];
   if (limit) args.push("--limit", String(limit));
 
   const pythonPath = path.join(DATA_DIR, "venv", "bin", "python");
@@ -64,10 +64,22 @@ function startProcess(limit: number | null, batchSize: number) {
     const lines = text.split("\n");
     for (const line of lines) {
       if (!line.trim()) continue;
-      // console.log("Log:", line);
-      const msg = isError ? { error: line } : { line };
+
+      let msg;
+      if (isError) {
+        msg = { error: line };
+      } else {
+        try {
+          // Try to parse structured JSON from Python
+          msg = JSON.parse(line);
+        } catch {
+          // Fallback for non-JSON lines (e.g. from libraries)
+          msg = { line: line };
+        }
+      }
+
       const json = JSON.stringify(msg);
-      state.logs.push(json); // Store history
+      state.logs.push(json);
       broadcast(msg);
     }
   };
