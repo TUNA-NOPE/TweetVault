@@ -1,14 +1,14 @@
 "use client";
 
 import { useState, useRef, useEffect } from "react";
-import { useRouter } from "next/navigation";
+import { useRouter }1 from "next/navigation";
 
 export default function ClassifyPanel({
   unclassifiedCount,
-  stats,
+  stats = { totalTweets: 0, classifiedTweets: 0 },
 }: {
   unclassifiedCount: number;
-  stats: { totalTweets: number; classifiedTweets: number };
+  stats?: { totalTweets: number; classifiedTweets: number };
 }) {
   const initialPercent = stats.totalTweets > 0
     ? Math.floor((stats.classifiedTweets / stats.totalTweets) * 100)
