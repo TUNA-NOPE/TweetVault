@@ -133,25 +133,8 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
         print(f"  Total batches: {total_batches}")
         print(f"  Rate limits: {REQUESTS_PER_MINUTE}/min, {daily_limit}/day")
 
-    for batch_num in range(total_batches):
-        # Report progress
-        processed_count = len(processed) + (batch_num * batch_size)
-        percent = int((processed_count / (total_tweets or 1)) * 100)
-        
-        if web_mode:
-            log_event("progress", {
-                "current": processed_count,
-                "total": total_tweets,
-                "percent": percent,
-                "remaining_batches": total_batches - batch_num
-            }, True)
-            
-            log_event("status", {
-                "message": f"Processing batch {batch_num + 1}/{total_batches}...",
-                "batch": batch_num + 1,
-                "total_batches": total_batches
-            }, True)
-
+    current_batch_index = 0
+    while current_batch_index < total_batches:
         # Check wait
         daily_reset = wait_for_rate_limit(requests_this_minute, requests_today, daily_limit)
         if daily_reset:
@@ -160,41 +143,72 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
             if web_mode:
                 log_event("status", {"message": "Daily limit reset, resuming..."}, True)
 
-        start = batch_num * batch_size
+        start = current_batch_index * batch_size
         batch = remaining[start : start + batch_size]
 
+        # Report progress
+        processed_count = len(processed) + (current_batch_index * batch_size)
+        percent = int((processed_count / (total_tweets or 1)) * 100)
+        
+        if web_mode:
+            log_event("progress", {
+                "current": processed_count,
+                "total": total_tweets,
+                "percent": percent,
+                "remaining_batches": total_batches - current_batch_index
+            }, True)
+            
+            log_event("status", {
+                "message": f"Processing batch {current_batch_index + 1}/{total_batches}...",
+                "batch": current_batch_index + 1,
+                "total_batches": total_batches
+            }, True)
+
         if not web_mode:
-            print(f"\n[Batch {batch_num + 1}/{total_batches}] {len(batch)} tweets")
+            print(f"\n[Batch {current_batch_index + 1}/{total_batches}] {len(batch)} tweets")
 
-        results = classify_batch(batch, categories)
-        requests_today += 1
-        requests_this_minute.append(time.time())
+        try:
+            results = classify_batch(batch, categories)
+            requests_today += 1
+            requests_this_minute.append(time.time())
 
-        for tid, author, _ in batch:
-            r = results[tid]
-            cats = r["categories"]
-            # if not web_mode:
-            #     print(f"  @{author} -> {cats}")
+            for tid, author, _ in batch:
+                r = results[tid]
+                cats = r["categories"]
+                # if not web_mode:
+                #     print(f"  @{author} -> {cats}")
 
-            for new_id, desc in r["new_categories"].items():
-                new_id = new_id.lower().replace(" ", "_")
-                if new_id not in categories:
-                    if web_mode:
-                        log_event("new_category", {"id": new_id, "desc": desc}, True)
-                    else:
-                        print(f"  + New category: {new_id}")
-                    categories[new_id] = desc
-                    dynamic[new_id] = desc
+                for new_id, desc in r["new_categories"].items():
+                    new_id = new_id.lower().replace(" ", "_")
+                    if new_id not in categories:
+                        if web_mode:
+                            log_event("new_category", {"id": new_id, "desc": desc}, True)
+                        else:
+                            print(f"  + New category: {new_id}")
+                        categories[new_id] = desc
+                        dynamic[new_id] = desc
 
-            processed[tid] = cats
+                processed[tid] = cats
 
-        if not dry_run:
-            save_progress(processed, requests_today)
-            if dynamic:
-                save_dynamic_categories(dynamic)
+            if not dry_run:
+                save_progress(processed, requests_today)
+                if dynamic:
+                    save_dynamic_categories(dynamic)
 
-        if batch_num < total_batches - 1:
-            time.sleep(RATE_LIMIT_DELAY)
+            # Success - move to next batch
+            current_batch_index += 1
+            
+            if current_batch_index < total_batches:
+                time.sleep(RATE_LIMIT_DELAY)
+
+        except Exception as e:
+            # On error, we DO NOT advance current_batch_index, so we retry.
+            if web_mode:
+                log_event("status", {"message": f"Error: {str(e)}. Retrying in 10s..."}, True)
+            else:
+                print(f"\n❌ Error: {e}")
+                print("   Retrying in 10 seconds...")
+            time.sleep(10)
 
     categorized = invert_to_categories(processed)
     
