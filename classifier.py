@@ -125,7 +125,8 @@ def classify_tweet(tweet_text: str, author: str = "unknown") -> list:
             {"role": "user", "content": prompt}
         ],
         "max_tokens": 200,
-        "temperature": 0.2
+        "temperature": 0.2,
+        "reasoning": {"enabled": True}
     }
     
     for attempt in range(MAX_RETRIES):

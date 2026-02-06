@@ -11,8 +11,8 @@ load_dotenv()
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 OPENROUTER_BASE_URL = "https://openrouter.ai/api/v1/chat/completions"
 
-# Free model from OpenRouter
-MODEL = "meta-llama/llama-3.1-8b-instruct:free"
+# Free route from OpenRouter (auto-selects best available free model)
+MODEL = "openrouter/free"
 
 # Rate limiting (free tier is limited)
 RATE_LIMIT_DELAY = 1.0  # seconds between requests
