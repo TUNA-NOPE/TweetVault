@@ -48,7 +48,7 @@ def print_summary(categorized: dict):
     print(f"  Categories used: {len(categorized)}")
 
 
-def wait_for_rate_limit(requests_this_minute: list[float], requests_today: int, daily_limit: int) -> bool:
+def wait_for_rate_limit(requests_this_minute: list[float], requests_today: int, daily_limit: int, web_mode: bool = False) -> bool:
     """Wait if we're hitting rate limits. Returns True if we can continue, False if daily limit hit."""
     now = time.time()
     
@@ -61,9 +61,13 @@ def wait_for_rate_limit(requests_this_minute: list[float], requests_today: int, 
         tomorrow = (now_dt + timedelta(days=1)).replace(hour=0, minute=0, second=5, microsecond=0)
         sleep_seconds = (tomorrow - now_dt).total_seconds()
         hours = sleep_seconds / 3600
-        print(f"\n⏸ Daily limit reached ({daily_limit} requests).")
-        print(f"  Sleeping for {hours:.1f} hours until midnight...")
-        print(f"  Will resume at {tomorrow.strftime('%Y-%m-%d %H:%M:%S')}")
+        
+        msg = f"Daily limit reached ({daily_limit}). Resuming in {hours:.1f}h..."
+        if web_mode:
+            log_event("status", {"message": msg}, True)
+        else:
+            print(f"\n⏸ {msg}")
+            
         time.sleep(sleep_seconds)
         return True  # Signal that we should reload requests_today
     
@@ -72,7 +76,12 @@ def wait_for_rate_limit(requests_this_minute: list[float], requests_today: int, 
         oldest = min(requests_this_minute)
         sleep_time = MINUTE_WINDOW - (now - oldest) + 1  # +1 second buffer
         if sleep_time > 0:
-            print(f"\n⏸ Minute rate limit ({REQUESTS_PER_MINUTE}/min) - sleeping {sleep_time:.0f}s...")
+            msg = f"Rate limited ({REQUESTS_PER_MINUTE}/min). Sleeping {sleep_time:.0f}s..."
+            if web_mode:
+                log_event("status", {"message": msg}, True)
+            else:
+                print(f"\n⏸ {msg}")
+            
             time.sleep(sleep_time)
             # Clean up again after sleeping
             now = time.time()
@@ -134,9 +143,22 @@ def process(tweets: list, limit: int | None, dry_run: bool, batch_size: int, dai
         print(f"  Rate limits: {REQUESTS_PER_MINUTE}/min, {daily_limit}/day")
 
     current_batch_index = 0
+    
+    # EMIT INITIAL PROGRESS immediately before entering loop/checking limits
+    if web_mode:
+        processed_count = len(processed)
+        percent = int((processed_count / (total_tweets or 1)) * 100)
+        log_event("progress", {
+            "current": processed_count,
+            "total": total_tweets,
+            "percent": percent,
+            "remaining_batches": total_batches
+        }, True)
+        log_event("status", {"message": "Resuming classification..."}, True)
+        
     while current_batch_index < total_batches:
         # Check wait
-        daily_reset = wait_for_rate_limit(requests_this_minute, requests_today, daily_limit)
+        daily_reset = wait_for_rate_limit(requests_this_minute, requests_today, daily_limit, web_mode)
         if daily_reset:
             requests_today = load_requests_today()
             requests_this_minute.clear()
