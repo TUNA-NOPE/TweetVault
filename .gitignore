@@ -1,0 +1,13 @@
+# Environment
+.env
+venv/
+__pycache__/
+*.pyc
+
+# Data files (too large / private)
+*.json
+!categories.json
+
+# Output
+output/
+progress.json
