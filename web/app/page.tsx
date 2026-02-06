@@ -1,14 +1,18 @@
 import Link from "next/link";
 import { getCategories, getStats } from "@/lib/data";
+import ClassifyPanel from "@/components/classify-panel";
+
+export const dynamic = "force-dynamic";
 
 export default function HomePage() {
   const categories = getCategories();
   const stats = getStats();
+  const unclassified = stats.totalTweets - stats.classifiedTweets;
 
   return (
     <div>
       {/* Stats bar */}
-      <div className="mb-8 flex gap-6 text-sm text-zinc-400">
+      <div className="mb-6 flex flex-wrap gap-x-6 gap-y-1 text-sm text-zinc-400">
         <span>
           <strong className="text-zinc-100">{stats.classifiedTweets}</strong>{" "}
           tweets classified
@@ -17,23 +21,29 @@ export default function HomePage() {
           <strong className="text-zinc-100">{stats.totalCategories}</strong>{" "}
           categories
         </span>
-        {stats.totalTweets > stats.classifiedTweets && (
+        {unclassified > 0 && (
           <span>
-            <strong className="text-zinc-100">
-              {stats.totalTweets - stats.classifiedTweets}
-            </strong>{" "}
+            <strong className="text-zinc-100">{unclassified}</strong>{" "}
             unclassified
           </span>
         )}
       </div>
 
+      {/* Classify panel — shown when there are unclassified tweets */}
+      {unclassified > 0 && (
+        <ClassifyPanel unclassifiedCount={unclassified} />
+      )}
+
       {/* Category grid */}
       {categories.length === 0 ? (
         <div className="rounded-xl border border-zinc-800 bg-zinc-900 p-12 text-center">
-          <p className="text-lg text-zinc-400 mb-2">No classified tweets yet</p>
+          <p className="text-lg text-zinc-400 mb-2">
+            No classified tweets yet
+          </p>
           <p className="text-sm text-zinc-500">
-            Run <code className="text-zinc-300">python main.py</code> to
-            classify your bookmarks first.
+            Click the button above or run{" "}
+            <code className="text-zinc-300">python main.py</code> to classify
+            your bookmarks.
           </p>
         </div>
       ) : (
