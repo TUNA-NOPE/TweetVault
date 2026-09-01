@@ -2,6 +2,19 @@
 
 import { useState, useRef, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
+import {
+  Play,
+  X,
+  Terminal,
+  CheckCircle2,
+  Loader2,
+  LayoutList,
+  ChevronDown,
+  ChevronUp,
+  Activity
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 export default function ClassifyPanel({
   unclassifiedCount,
@@ -26,8 +39,10 @@ export default function ClassifyPanel({
   const router = useRouter();
 
   useEffect(() => {
-    logsRef.current?.scrollTo(0, logsRef.current.scrollHeight);
-  }, [logs]);
+    if (logsRef.current) {
+      logsRef.current.scrollTop = logsRef.current.scrollHeight;
+    }
+  }, [logs, showDebug]);
 
   // Check for active session on mount
   useEffect(() => {
@@ -36,17 +51,12 @@ export default function ClassifyPanel({
       .then((data) => {
         if (data.running) {
           setOpen(true);
-
-          // Instant resume state
           if (data.progress) setProgress(data.progress.percent);
           if (data.status) setStatusMessage(data.status.message);
-
-          // Small delay to ensure state updates before starting stream
           setTimeout(() => start(true), 100);
         }
       })
       .catch(() => { });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   // Auto-refresh stats while running
@@ -64,13 +74,9 @@ export default function ClassifyPanel({
     if (!isResume) {
       setLogs([]);
       setDone(false);
-      // Don't reset to 0, reset to current "actual" progress from server stats if available
-      // But better to trust the initialPercent or keep current if we have it
       setProgress(progress > 0 ? progress : initialPercent);
       setStatusMessage("Initializing...");
     } else {
-      // If resuming, we want to reset 'done' to false just in case, 
-      // but keep existing logs/progress/status
       setDone(false);
     }
 
@@ -133,121 +139,200 @@ export default function ClassifyPanel({
     }
   }
 
-  if (!open) {
-    return (
-      <button
-        onClick={() => setOpen(true)}
-        className="mb-6 flex items-center gap-2 rounded-lg bg-blue-600 px-4 py-2 text-sm
-                   font-medium text-white hover:bg-blue-500 transition-colors"
-      >
-        <svg className="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-          <path strokeLinecap="round" strokeLinejoin="round" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-        </svg>
-        Classify {unclassifiedCount} bookmarks
-      </button>
-    );
-  }
-
   return (
-    <div className="mb-6 rounded-xl border border-zinc-800 bg-zinc-900 p-5">
-      <div className="flex items-center justify-between mb-4">
-        <h2 className="font-semibold text-zinc-100">Classify Bookmarks</h2>
-        {!running && (
-          <button
-            onClick={() => { setOpen(false); setLogs([]); setDone(false); }}
-            className="text-zinc-500 hover:text-zinc-300 text-sm"
+    <div className="mb-8 w-full">
+      <AnimatePresence mode="wait">
+        {!open ? (
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            transition={{ type: "spring", stiffness: 300, damping: 25 }}
+            className="flex justify-start"
           >
-            Close
-          </button>
-        )}
-      </div>
-
-      {!running && !done && (
-        <div className="flex items-center gap-3">
-          <input
-            type="number"
-            value={limit}
-            onChange={(e) => setLimit(e.target.value)}
-            placeholder="All tweets"
-            min={1}
-            className="w-32 rounded-lg border border-zinc-700 bg-zinc-800 px-3 py-1.5 text-sm
-                       text-zinc-100 placeholder-zinc-500 outline-none focus:border-blue-500
-                       transition-colors"
-          />
-          <button
-            onClick={() => start(false)}
-            className="rounded-lg bg-blue-600 px-4 py-1.5 text-sm font-medium text-white
-                       hover:bg-blue-500 transition-colors"
-          >
-            Start
-          </button>
-          <span className="text-xs text-zinc-500">
-            {unclassifiedCount} unclassified
-          </span>
-        </div>
-      )}
-
-      {(running || logs.length > 0) && (
-        <div className="mt-4 space-y-4">
-          {/* Progress Bar */}
-          <div className="space-y-2">
-            <div className="flex items-center justify-between text-xs text-zinc-400">
-              <span>{statusMessage || "Starting..."}</span>
-              <span>{progress}%</span>
-            </div>
-            <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-800">
-              <div
-                className="h-full bg-blue-500 transition-all duration-300 ease-out"
-                style={{ width: `${progress}%` }}
-              />
-            </div>
-          </div>
-
-          {/* New Categories Toast / Info area could go here */}
-
-          {/* Debug Toggle */}
-          <div className="pt-2">
             <button
-              onClick={() => setShowDebug(!showDebug)}
-              className="text-[10px] uppercase tracking-wider text-zinc-600 hover:text-zinc-400"
+              onClick={() => setOpen(true)}
+              className="group relative flex items-center gap-3 rounded-full bg-zinc-900/50 px-6 py-3 
+                         text-sm font-medium text-zinc-100 ring-1 ring-white/10 backdrop-blur-xl 
+                         transition-all hover:bg-zinc-800/60 hover:ring-white/20 active:scale-95"
             >
-              {showDebug ? "Hide Debug Logs" : "Show Debug Logs"}
+              <div className="absolute inset-0 -z-10 rounded-full bg-gradient-to-r from-blue-500/0 via-blue-500/10 to-indigo-500/0 opacity-0 transition-opacity group-hover:opacity-100" />
+              <Activity className="h-4 w-4 text-blue-400" />
+              <span>
+                Classify <span className="font-bold text-white">{unclassifiedCount}</span> new bookmarks
+              </span>
+              <div className="ml-1 h-1.5 w-1.5 rounded-full bg-blue-500 animate-pulse" />
             </button>
-          </div>
-
-          {/* Hidden Logs */}
-          {showDebug && (
-            <div
-              ref={logsRef}
-              className="max-h-48 overflow-y-auto rounded-lg bg-zinc-950 p-3 font-mono
-                         text-xs leading-relaxed text-zinc-400"
-            >
-              {logs.map((log, i) => (
-                <div key={i} className={log.type === "error" ? "text-red-400" : "text-zinc-500"}>
-                  {log.text}
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-      )}
-
-      {done && (
-        <div className="mt-4 flex items-center gap-3">
-          <span className="text-sm text-green-400">Classification complete</span>
-          <button
-            onClick={() => router.refresh()}
-            className="rounded-lg bg-zinc-800 px-3 py-1.5 text-sm font-medium text-zinc-300
-                       hover:bg-zinc-700 transition-colors"
+          </motion.div>
+        ) : (
+          <motion.div
+            initial={{ opacity: 0, y: -20 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, scale: 0.95 }}
+            className="rounded-2xl border border-white/10 bg-zinc-900 shadow-2xl overflow-hidden"
           >
-            Refresh page
-          </button>
-        </div>
-      )}
+            <div className="p-6">
+              {/* Header */}
+              <div className="mb-6 flex items-center justify-between">
+                <div className="flex items-center gap-3">
+                  <div className={cn(
+                    "flex h-10 w-10 items-center justify-center rounded-xl bg-gradient-to-br transition-all duration-500",
+                    running ? "from-blue-500/20 to-indigo-500/20 shadow-lg shadow-blue-500/10" : "from-zinc-800 to-zinc-900"
+                  )}>
+                    <LayoutList className={cn("h-5 w-5 transition-colors", running ? "text-blue-400" : "text-zinc-400")} />
+                  </div>
+                  <div>
+                    <h2 className="font-semibold text-zinc-100">Classification Engine</h2>
+                    <p className="text-xs text-zinc-500">
+                      {running ? "Processing your bookmarks..." : "Ready to organize your feed"}
+                    </p>
+                  </div>
+                </div>
+                {!running && (
+                  <button
+                    onClick={() => { setOpen(false); setLogs([]); setDone(false); }}
+                    className="flex h-8 w-8 items-center justify-center rounded-lg text-zinc-500 
+                               hover:bg-white/5 hover:text-zinc-300 transition-colors"
+                  >
+                    <X className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
 
-      <p className="mt-4 text-xs text-zinc-600">
-        Or run manually: <code className="text-zinc-500">python main.py</code>
-      </p>
+              {/* Controls */}
+              {!running && !done && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="flex flex-wrap items-center gap-3"
+                >
+                  <div className="relative group">
+                    <div className="absolute inset-y-0 left-3 flex items-center pointer-events-none">
+                      <span className="text-zinc-500 text-xs">Limit:</span>
+                    </div>
+                    <input
+                      type="number"
+                      value={limit}
+                      onChange={(e) => setLimit(e.target.value)}
+                      placeholder="All"
+                      min={1}
+                      className="w-32 rounded-xl border border-zinc-800 bg-zinc-900/50 pl-12 pr-3 py-2 text-sm
+                                 text-zinc-100 placeholder-zinc-600 outline-none focus:border-blue-500/50
+                                 focus:ring-2 focus:ring-blue-500/20 transition-all font-mono"
+                    />
+                  </div>
+
+                  <button
+                    onClick={() => start(false)}
+                    className="flex items-center gap-2 rounded-xl bg-gradient-to-r from-blue-600 to-indigo-600 
+                               px-5 py-2 text-sm font-medium text-white shadow-lg shadow-blue-500/20
+                               hover:shadow-blue-500/30 hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    <Play className="h-4 w-4 fill-current" />
+                    Start Processing
+                  </button>
+
+                  <span className="text-xs font-medium text-zinc-500 px-2 bg-zinc-900/50 py-1 rounded-md border border-zinc-800/50">
+                    {unclassifiedCount} pending
+                  </span>
+                </motion.div>
+              )}
+
+              {/* Progress & Status */}
+              {(running || logs.length > 0) && (
+                <div className="space-y-6">
+                  {/* Progress Bar */}
+                  <div className="relative">
+                    <div className="flex items-center justify-between text-xs font-medium mb-3">
+                      <span className={cn(
+                        "flex items-center gap-2 transition-colors",
+                        done ? "text-green-400" : "text-blue-400"
+                      )}>
+                        {done ? <CheckCircle2 className="h-3 w-3" /> : <Loader2 className="h-3 w-3 animate-spin" />}
+                        {statusMessage || "Starting..."}
+                      </span>
+                      <span className="text-zinc-400 font-mono">{progress}%</span>
+                    </div>
+                    <div className="h-2 w-full overflow-hidden rounded-full bg-zinc-900/50 ring-1 ring-white/5">
+                      <motion.div
+                        className="h-full rounded-full bg-gradient-to-r from-blue-500 to-indigo-500 relative overflow-hidden"
+                        initial={{ width: 0 }}
+                        animate={{ width: `${progress}%` }}
+                        transition={{ ease: "easeInOut" }}
+                      >
+                        <div className="absolute inset-0 bg-white/20 animate-[shimmer_2s_infinite]"
+                          style={{ transform: 'skewX(-20deg) translateX(-150%)' }} />
+                      </motion.div>
+                    </div>
+                  </div>
+
+                  {/* Debug Logs Toggle */}
+                  <div>
+                    <button
+                      onClick={() => setShowDebug(!showDebug)}
+                      className="flex items-center gap-2 text-[10px] uppercase tracking-wider font-semibold 
+                                 text-zinc-600 hover:text-zinc-400 transition-colors"
+                    >
+                      <Terminal className="h-3 w-3" />
+                      {showDebug ? "Hide Logs" : "Show Logs"}
+                      {showDebug ? <ChevronUp className="h-3 w-3" /> : <ChevronDown className="h-3 w-3" />}
+                    </button>
+
+                    <AnimatePresence>
+                      {showDebug && (
+                        <motion.div
+                          initial={{ opacity: 0, height: 0 }}
+                          animate={{ opacity: 1, height: "auto" }}
+                          exit={{ opacity: 0, height: 0 }}
+                          className="overflow-hidden"
+                        >
+                          <div
+                            ref={logsRef}
+                            className="mt-3 max-h-48 overflow-y-auto rounded-xl border border-zinc-800/50 
+                                     bg-black/40 p-3 font-mono text-xs leading-relaxed backdrop-blur-sm"
+                          >
+                            {logs.map((log, i) => (
+                              <div key={i} className={cn(
+                                "border-l-2 pl-2 mb-1",
+                                log.type === "error" ? "border-red-500/50 text-red-400" :
+                                  log.type === "info" ? "border-blue-500/50 text-blue-400" :
+                                    "border-zinc-700/50 text-zinc-500"
+                              )}>
+                                {log.text}
+                              </div>
+                            ))}
+                            {logs.length === 0 && <span className="text-zinc-700 italic">No logs yet...</span>}
+                          </div>
+                        </motion.div>
+                      )}
+                    </AnimatePresence>
+                  </div>
+                </div>
+              )}
+
+              {/* Done State */}
+              {done && (
+                <motion.div
+                  initial={{ opacity: 0, y: 10 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  className="mt-6 flex items-center gap-4 border-t border-white/5 pt-4"
+                >
+                  <button
+                    onClick={() => router.refresh()}
+                    className="flex items-center gap-2 rounded-xl bg-zinc-100 px-4 py-2 text-sm font-medium 
+                               text-zinc-900 hover:bg-white hover:scale-[1.02] active:scale-[0.98] transition-all"
+                  >
+                    Refresh View
+                  </button>
+                  <p className="text-xs text-zinc-500">
+                    Process complete. <code className="rounded bg-zinc-900 px-1 py-0.5 text-zinc-400">Ctrl+R</code> to reload manually.
+                  </p>
+                </motion.div>
+              )}
+            </div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
