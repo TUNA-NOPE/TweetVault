@@ -2,6 +2,7 @@
 
 import { useSearchParams } from "next/navigation";
 import { useEffect, useState, Suspense } from "react";
+import Link from "next/link";
 import TweetCard from "@/components/tweet-card";
 import type { Tweet } from "@/lib/data";
 
@@ -69,14 +70,14 @@ function SearchResults() {
               </p>
               <div className="flex flex-wrap gap-1.5">
                 {result.matchedCategories.map((c) => (
-                  <a
+                  <Link
                     key={c}
                     href={`/category/${c}`}
-                    className="rounded-md bg-blue-600/20 px-2 py-0.5 text-xs text-blue-400
-                               hover:bg-blue-600/30 transition-colors"
+                    className="rounded-md bg-zinc-800 px-2 py-0.5 text-xs text-zinc-400
+                               hover:bg-zinc-700 transition-colors"
                   >
                     {c.replace(/_/g, " ")}
-                  </a>
+                  </Link>
                 ))}
               </div>
             </div>
