@@ -10,9 +10,11 @@ body {
 ::-webkit-scrollbar {
   @apply w-2;
 }
+
 ::-webkit-scrollbar-track {
   @apply bg-zinc-950;
 }
+
 ::-webkit-scrollbar-thumb {
   @apply bg-zinc-700 rounded-full;
 }

@@ -1,4 +1,19 @@
 {
   "transcription_tools": "Links to transcription repositories and a transcription bot",
-  "math_discovery": "General formula for polynomial roots after 200 years of attempts"
+  "math_discovery": "General formula for polynomial roots after 200 years of attempts",
+  "engineering_security": "Designing secure underground facilities",
+  "unidentified_content": "Short message with unclear content, possibly a typo or incomplete tweet",
+  "macro_finance": "Macroeconomic events affecting markets",
+  "adult_content": "Explicit sexual content, adult themes, NSFW material",
+  "summarization_tools": "Tools for summarizing articles",
+  "hebrew_content": "Tweet in Hebrew discussing financial websites and options flow",
+  "shock_content": "Tweet expressing shock/surprise at linked content",
+  "appreciation_content": "Tweet expressing appreciation for linked content",
+  "preference_content": "Tweet expressing liking/preference for linked content",
+  "etf_content": "Tweet listing top 20 most active ETFs in the stock market",
+  "dead_internet_theory": "Conspiracy theories or discussions about the 'dead internet' phenomenon",
+  "infrastructure_development": "Discussions about physical infrastructure projects like data centers",
+  "cybersecurity": "Content related to cybersecurity, hacking techniques, security vulnerabilities, and defensive measures",
+  "new_id": "weapon_manufacturing",
+  "description": "Content related to firearm manufacturing or related topics"
 }
